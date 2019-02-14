@@ -1,0 +1,1212 @@
+diff --git a/docshell/base/nsDocShell.cpp b/docshell/base/nsDocShell.cpp
+index fb6974f..6928970 100644
+--- a/docshell/base/nsDocShell.cpp
++++ b/docshell/base/nsDocShell.cpp
+@@ -11631,6 +11631,16 @@ nsDocShell::OnNewURI(nsIURI* aURI, nsIChannel* aChannel,
+   NS_PRECONDITION(aURI, "uri is null");
+   NS_PRECONDITION(!aChannel || !aTriggeringPrincipal, "Shouldn't have both set");
+ 
++    //logging
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    nsAutoCString s_a;
++    nsresult my_rv;
++    my_rv = aURI->GetSpec(s_a);
++    fprintf(flog, "f=nsDocShell::OnNewURI\taURI=%s\n", s_a.get());
++    fflush(flog);
++    fclose(flog);
++
+   MOZ_ASSERT(!aPrincipalToInherit || (aPrincipalToInherit && aTriggeringPrincipal));
+ 
+ #if defined(DEBUG)
+diff --git a/netwerk/protocol/http/HttpBaseChannel.cpp b/netwerk/protocol/http/HttpBaseChannel.cpp
+index f54bdb7..388111d 100644
+--- a/netwerk/protocol/http/HttpBaseChannel.cpp
++++ b/netwerk/protocol/http/HttpBaseChannel.cpp
+@@ -1332,6 +1332,38 @@ HttpBaseChannel::SetReferrerWithPolicy(nsIURI *referrer,
+     return NS_OK;
+   }
+ 
++ 
++  //logging
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    nsAutoCString s_a;
++    nsresult my_rv;
++    my_rv = referrer->GetSpec(s_a);
++    nsAutoCString s_b;
++    my_rv = mURI->GetSpec(s_b);
++    nsAutoCString logtriggeringURISpec;
++    int gotURI = 0;
++    if (mLoadInfo) {
++     nsCOMPtr<nsIPrincipal> logtriggeringPrincipal = mLoadInfo->TriggeringPrincipal();
++     nsCOMPtr<nsIURI> logtriggeringURI;
++     if (logtriggeringPrincipal) {
++      logtriggeringPrincipal->GetURI(getter_AddRefs(logtriggeringURI));
++      if (logtriggeringURI) {
++        logtriggeringURI->GetAsciiSpec(logtriggeringURISpec);
++        gotURI = 1;
++      }
++     }
++    }
++    if (gotURI == 1) {
++      fprintf(flog, "f=HttpBaseChannel::SetReferrerWithPolicy\tptr=%p\treferrer=%s\tmURI=%s\ttriggeringURI=%s\n", this, s_a.get(), s_b.get(), logtriggeringURISpec.get());
++    }
++    else {
++      fprintf(flog, "f=HttpBaseChannel::SetReferrerWithPolicy\tptr=%p\treferrer=%s\tmURI=%s\n", this, s_a.get(), s_b.get());
++    }
++    fflush(flog);
++    fclose(flog);
++
++
+   // Don't send referrer at all when the meta referrer setting is "no-referrer"
+   if (referrerPolicy == REFERRER_POLICY_NO_REFERRER) {
+     mReferrerPolicy = REFERRER_POLICY_NO_REFERRER;
+diff --git a/netwerk/protocol/http/TunnelUtils.cpp b/netwerk/protocol/http/TunnelUtils.cpp
+index 4cc24a0..1fb44aa 100644
+--- a/netwerk/protocol/http/TunnelUtils.cpp
++++ b/netwerk/protocol/http/TunnelUtils.cpp
+@@ -179,6 +179,7 @@ TLSFilterTransaction::OnReadSegment(const char *aData,
+ 
+   while (aCount > 0) {
+     int32_t written = PR_Write(mFD, aData, aCount);
++
+     LOG(("TLSFilterTransaction %p OnReadSegment PRWrite(%d) = %d %d\n",
+          this, aCount, written,
+          PR_GetError() == PR_WOULD_BLOCK_ERROR));
+diff --git a/netwerk/protocol/http/nsHttpChannel.cpp b/netwerk/protocol/http/nsHttpChannel.cpp
+index b38be48..17aba16 100644
+--- a/netwerk/protocol/http/nsHttpChannel.cpp
++++ b/netwerk/protocol/http/nsHttpChannel.cpp
+@@ -102,6 +102,7 @@
+ #include "nsMixedContentBlocker.h"
+ #include "HSTSPrimerListener.h"
+ #include "CacheStorageService.h"
++#include "sys/time.h" //logging
+ 
+ namespace mozilla { namespace net {
+ 
+@@ -978,6 +979,34 @@ nsHttpChannel::SetupTransaction()
+     mTransaction->SetTransactionObserver(mTransactionObserver);
+     mTransactionObserver = nullptr;
+ 
++    //logging 
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    nsAutoCString s_b;
++    nsresult my_rv;
++    my_rv = mURI->GetSpec(s_b);
++    nsAutoCString logtriggeringURISpec;
++    int gotURI = 0;
++    if (mLoadInfo) {
++     nsCOMPtr<nsIPrincipal> logtriggeringPrincipal = mLoadInfo->TriggeringPrincipal();
++     nsCOMPtr<nsIURI> logtriggeringURI;
++     if (logtriggeringPrincipal) {
++      logtriggeringPrincipal->GetURI(getter_AddRefs(logtriggeringURI));
++      if (logtriggeringURI) {
++        logtriggeringURI->GetAsciiSpec(logtriggeringURISpec);
++        gotURI = 1;
++      }
++     }
++    }
++    if (gotURI == 1) {
++      fprintf(flog, "f=nsHttpChannel::SetupTransaction\tptr=%p\tmTransaction=%p\tmURI=%s\ttriggeringURI=%s\n", this, mTransaction.get(), s_b.get(), logtriggeringURISpec.get());
++    }
++    else {
++      fprintf(flog, "f=nsHttpChannel::SetupTransaction\ttype=WithoutTrigger\tptr=%p\tmTransaction=%p\tmURI=%s\n", this, mTransaction.get(), s_b.get());
++    }
++    fflush(flog);
++    fclose(flog);
++
+     // See bug #466080. Transfer LOAD_ANONYMOUS flag to socket-layer.
+     if (mLoadFlags & LOAD_ANONYMOUS)
+         mCaps |= NS_HTTP_LOAD_ANONYMOUS;
+@@ -5414,6 +5443,19 @@ nsHttpChannel::AsyncProcessRedirection(uint32_t redirectType)
+ 
+     nsresult rv = CreateNewURI(location.get(), getter_AddRefs(mRedirectURI));
+ 
++  //logging
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    nsAutoCString s_a;
++    nsresult my_rv;
++    my_rv = mRedirectURI->GetSpec(s_a);
++    nsAutoCString s_b;
++    my_rv = mURI->GetSpec(s_b);
++    fprintf(flog, "f=nsHttpChannel::AsyncProcessRedirection\tmRedirectURI=%s\tmURI=%s\n", s_a.get(), s_b.get());
++    fflush(flog);
++    fclose(flog);
++
++
+     if (NS_FAILED(rv)) {
+         LOG(("Invalid URI for redirect: Location: %s\n", location.get()));
+         return NS_ERROR_CORRUPTED_CONTENT;
+@@ -5835,6 +5877,19 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
+         return rv;
+     }
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    nsresult my_rv;
++    nsAutoCString my_s;
++    my_rv = mURI->GetSpec(my_s);
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpChannel::AsyncOpen\tt=%f\tmURI=%s\n", tp_now, my_s.get());
++    fflush(flog);
++    fclose(flog);
++
+     if (mInterceptCache != INTERCEPTED && ShouldIntercept()) {
+         mInterceptCache = MAYBE_INTERCEPT;
+         SetCouldBeSynthesized();
+@@ -5918,6 +5973,19 @@ nsHttpChannel::BeginConnect()
+     LOG(("nsHttpChannel::BeginConnect [this=%p]\n", this));
+     nsresult rv;
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    nsresult my_rv;
++    nsAutoCString my_s;
++    my_rv = mURI->GetSpec(my_s);
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpChannel::BeginConnect\tt=%f\tthis=%p\tmURI=%s\n", tp_now, this, my_s.get());
++    fflush(flog);
++    fclose(flog);
++
+     // Construct connection info object
+     nsAutoCString host;
+     nsAutoCString scheme;
+@@ -6167,6 +6235,7 @@ nsHttpChannel::BeginConnectContinue()
+     //    trying to establish a keep-alive connection.
+     if (mRequestHead.HasHeaderValue(nsHttp::Connection, "close"))
+         mCaps &= ~(NS_HTTP_ALLOW_KEEPALIVE | NS_HTTP_ALLOW_PIPELINING);
++    
+ 
+     if (gHttpHandler->CriticalRequestPrioritization()) {
+         if (mClassOfService & nsIClassOfService::Leader) {
+@@ -6177,6 +6246,13 @@ nsHttpChannel::BeginConnectContinue()
+         }
+     }
+ 
++    //logging
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpChannel::BeginConnectContinue\tthis=%p\tmCaps=%u\n", this, mCaps);
++    fflush(flog);
++    fclose(flog);
++
+     // Force-Reload should reset the persistent connection pool for this host
+     if (mLoadFlags & LOAD_FRESH_CONNECTION) {
+         // just the initial document resets the whole pool
+@@ -6364,6 +6440,19 @@ nsHttpChannel::OnProxyAvailable(nsICancelable *request, nsIChannel *channel,
+          this, pi, status, mStatus));
+     mProxyRequest = nullptr;
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    nsresult my_rv;
++    nsAutoCString my_s;
++    my_rv = mURI->GetSpec(my_s);
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpChannel::OnProxyAvailable\tt=%f\tthis=%p\tmURI=%s\n", tp_now, this, my_s.get());
++    fflush(flog);
++    fclose(flog);
++
+     nsresult rv;
+ 
+     // If status is a failure code, then it means that we failed to resolve
+diff --git a/netwerk/protocol/http/nsHttpConnection.cpp b/netwerk/protocol/http/nsHttpConnection.cpp
+index 916d124..4b067c6 100644
+--- a/netwerk/protocol/http/nsHttpConnection.cpp
++++ b/netwerk/protocol/http/nsHttpConnection.cpp
+@@ -36,6 +36,7 @@
+ #include "nsStringStream.h"
+ #include "sslt.h"
+ #include "TunnelUtils.h"
++#include "sys/time.h" //logging
+ 
+ namespace mozilla {
+ namespace net {
+@@ -149,6 +150,16 @@ nsHttpConnection::Init(nsHttpConnectionInfo *info,
+     mSocketIn = instream;
+     mSocketOut = outstream;
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnection::Init\tt=%f\tthis=%p\tmSocketIn=%p\tmSocketOut=%p\n", tp_now, this, mSocketIn, mSocketOut);
++    fflush(flog);
++    fclose(flog);
++
+     // See explanation for non-strictness of this operation in SetSecurityCallbacks.
+     mCallbacks = new nsMainThreadPtrHolder<nsIInterfaceRequestor>(callbacks, false);
+ 
+@@ -288,6 +299,16 @@ nsHttpConnection::EnsureNPNComplete(nsresult &aOut0RTTWriteHandshakeValue,
+     aOut0RTTWriteHandshakeValue = NS_OK;
+     aOut0RTTBytesWritten = 0;
+ 
++
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnection::EnsureNPNComplete\tt=%f\n", tp_now);
++    fflush(flog);
++    fclose(flog);
++
+     MOZ_ASSERT(mSocketTransport);
+     if (!mSocketTransport) {
+         // this cannot happen
+@@ -314,6 +335,13 @@ nsHttpConnection::EnsureNPNComplete(nsresult &aOut0RTTWriteHandshakeValue,
+         goto npnComplete;
+ 
+     rv = ssl->GetNegotiatedNPN(negotiatedNPN);
++
++
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnection::EnsureNPNComplete GetNegotiatedNPN\tt=%f\trv=%x\n", tp_now, rv);
++    fflush(flog);
++    fclose(flog);
++
+     if (!m0RTTChecked && (rv == NS_ERROR_NOT_CONNECTED) &&
+         !mConnInfo->UsingProxy()) {
+         // There is no ALPN info (yet!). We need to consider doing 0RTT. We
+@@ -473,6 +501,16 @@ nsHttpConnection::Activate(nsAHttpTransaction *trans, uint32_t caps, int32_t pri
+     LOG(("nsHttpConnection::Activate [this=%p trans=%p caps=%x]\n",
+          this, trans, caps));
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnection::Activate\tt=%f\tthis=%p\ttrans=%p\n", tp_now, this, trans);
++    fflush(flog);
++    fclose(flog);
++
+     if (!trans->IsNullTransaction())
+         mExperienced = true;
+ 
+@@ -676,6 +714,16 @@ nsHttpConnection::Close(nsresult reason, bool aIsShutdown)
+ {
+     LOG(("nsHttpConnection::Close [this=%p reason=%x]\n", this, reason));
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnection::Close\tt=%f\tthis=%p\treason=%x\n", tp_now, this, reason);
++    fflush(flog);
++    fclose(flog);
++
+     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+ 
+     // Ensure TCP keepalive timer is stopped.
+@@ -1686,6 +1734,16 @@ nsHttpConnection::OnSocketWritable()
+     LOG(("nsHttpConnection::OnSocketWritable [this=%p] host=%s\n",
+          this, mConnInfo->Origin()));
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnection::OnSocketWritable\tt=%f\tthis=%p\n", tp_now, this);
++    fflush(flog);
++    fclose(flog);
++
+     nsresult rv;
+     uint32_t transactionBytes;
+     bool again = true;
+@@ -1694,6 +1752,11 @@ nsHttpConnection::OnSocketWritable()
+         rv = mSocketOutCondition = NS_OK;
+         transactionBytes = 0;
+ 
++	    gettimeofday(&tp, NULL);
++        tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++        flog = fopen("test.tbrlog", "a+");
++        fprintf(flog, "f=nsHttpConnection::OnSocketWritable looping\tt=%f\tthis=%p\t", tp_now, this);
++
+         // The SSL handshake must be completed before the transaction->readsegments()
+         // processing can proceed because we need to know how to format the
+         // request differently for http/1, http/2, spdy, etc.. and that is
+@@ -1703,6 +1766,7 @@ nsHttpConnection::OnSocketWritable()
+             !EnsureNPNComplete(rv, transactionBytes)) {
+             MOZ_ASSERT(!transactionBytes);
+             mSocketOutCondition = NS_BASE_STREAM_WOULD_BLOCK;
++            fprintf(flog, "1\n");
+         } else if (mProxyConnectStream) {
+             // If we're need an HTTP/1 CONNECT tunnel through a proxy
+             // send it before doing the SSL handshake
+@@ -1710,14 +1774,17 @@ nsHttpConnection::OnSocketWritable()
+             rv = mProxyConnectStream->ReadSegments(ReadFromStream, this,
+                                                    nsIOService::gDefaultSegmentSize,
+                                                    &transactionBytes);
++            fprintf(flog, "2\n");
+         } else if (!EnsureNPNComplete(rv, transactionBytes)) {
+             if (NS_SUCCEEDED(rv) && !transactionBytes &&
+                 NS_SUCCEEDED(mSocketOutCondition)) {
+                 mSocketOutCondition = NS_BASE_STREAM_WOULD_BLOCK;
+             }
++            fprintf(flog, "3\n");
+         } else if (!mTransaction) {
+             rv = NS_ERROR_FAILURE;
+             LOG(("  No Transaction In OnSocketWritable\n"));
++            fprintf(flog, "4\n");
+         } else {
+ 
+             // for non spdy sessions let the connection manager know
+@@ -1732,7 +1799,11 @@ nsHttpConnection::OnSocketWritable()
+             rv = mTransaction->ReadSegmentsAgain(this, nsIOService::gDefaultSegmentSize,
+                                                  &transactionBytes, &again);
+             mContentBytesWritten += transactionBytes;
++            fprintf(flog, "5\n");
+         }
++        fprintf(flog, "f=nsHttpConnection::OnSocketWritable after possible ReadSegments\tt=%f\tthis=%p\trv=%x\tread=%u\tcond=%x\n", tp_now, this, rv, transactionBytes, mSocketOutCondition);
++        fflush(flog);
++        fclose(flog);
+ 
+         LOG(("nsHttpConnection::OnSocketWritable %p "
+              "ReadSegments returned [rv=%x read=%u sock-cond=%x]\n",
+diff --git a/netwerk/protocol/http/nsHttpConnectionMgr.cpp b/netwerk/protocol/http/nsHttpConnectionMgr.cpp
+index 837ab29..eaafed6 100644
+--- a/netwerk/protocol/http/nsHttpConnectionMgr.cpp
++++ b/netwerk/protocol/http/nsHttpConnectionMgr.cpp
+@@ -35,6 +35,7 @@
+ #include "mozilla/ChaosMode.h"
+ #include "mozilla/Unused.h"
+ #include "nsIURI.h"
++#include "sys/time.h" //logging
+ 
+ #include "mozilla/Telemetry.h"
+ 
+@@ -408,6 +409,15 @@ nsHttpConnectionMgr::SpeculativeConnect(nsHttpConnectionInfo *ci,
+ {
+     MOZ_ASSERT(NS_IsMainThread(), "nsHttpConnectionMgr::SpeculativeConnect called off main thread!");
+ 
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::SpeculativeConnect called\tt=%f\tci=%s\n", tp_now, ci->HashKey().get());
++    fflush(flog);
++    fclose(flog);
++
+     if (!IsNeckoChild()) {
+         // HACK: make sure PSM gets initialized on the main thread.
+         net_EnsurePSMInit();
+@@ -867,6 +877,28 @@ bool
+ nsHttpConnectionMgr::ProcessPendingQForEntry(nsConnectionEntry *ent, bool considerAll)
+ {
+     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
++            
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::ProcessPendingQForEntry called\tt=%f\tent=%p\tci=%s\n", tp_now, ent, ent->mConnInfo->HashKey().get());
++    for (int i = 0; i < ent->mPendingQ.Length(); i++) {
++        fprintf(flog, "mPendingQ\tnum=(%d/%d)\tent=%p\ttrans=%p\n", i, ent->mPendingQ.Length(), ent, ent->mPendingQ[i].get());
++    }
++    for (int i = 0; i < ent->mActiveConns.Length(); i++) {
++        fprintf(flog, "mActiveConns\tnum=(%d/%d)\tent=%p\tconn=%p\n", i, ent->mActiveConns.Length(), ent, ent->mActiveConns[i].get());
++    }
++    for (int i = 0; i < ent->mIdleConns.Length(); i++) {
++        fprintf(flog, "mIdleConns\tnum=(%d/%d)\tent=%p\tconn=%p\n", i, ent->mIdleConns.Length(), ent, ent->mIdleConns[i].get());
++    }
++    for (int i = 0; i < ent->mHalfOpens.Length(); i++) {
++        fprintf(flog, "mHalfOpens\tnum=(%d/%d)\tent=%p\tconn=%p\n", i, ent->mHalfOpens.Length(), ent, ent->mHalfOpens[i]);
++    }
++    fflush(flog);
++    fclose(flog);
+ 
+     LOG(("nsHttpConnectionMgr::ProcessPendingQForEntry "
+          "[ci=%s ent=%p active=%d idle=%d queued=%d]\n",
+@@ -909,6 +941,10 @@ nsHttpConnectionMgr::ProcessPendingQForEntry(nsConnectionEntry *ent, bool consid
+                                     alreadyHalfOpen || !!trans->TunnelProvider(),
+                                     trans);
+         if (NS_SUCCEEDED(rv) || (rv != NS_ERROR_NOT_AVAILABLE)) {
++            flog = fopen("test.tbrlog", "a+");
++            fprintf(flog, "f=nsHttpConnectionMgr::ProcessPendingQForEntry after TryDispatchTransaction\trv=%x\tnum=(%d/%d)\tent=%p\ttrans=%p\n", rv, i, ent->mPendingQ.Length(), ent, trans);
++            fflush(flog);
++            fclose(flog);
+             if (NS_SUCCEEDED(rv))
+                 LOG(("  dispatching pending transaction...\n"));
+             else
+@@ -919,6 +955,10 @@ nsHttpConnectionMgr::ProcessPendingQForEntry(nsConnectionEntry *ent, bool consid
+                 // trans is now potentially destroyed
+                 dispatchedSuccessfully = true;
+                 dispatchCount++;
++                flog = fopen("test.tbrlog", "a+");
++                fprintf(flog, "f=nsHttpConnectionMgr::ProcessPendingQForEntry dispatchedSuccessfully\tnum=(%d/%d)\tent=%p\ttrans=%p\n", i, ent->mPendingQ.Length(), ent, trans);
++                fflush(flog);
++                fclose(flog);
+                 continue; // dont ++i as we just made the array shorter
+             }
+ 
+@@ -932,6 +972,11 @@ nsHttpConnectionMgr::ProcessPendingQForEntry(nsConnectionEntry *ent, bool consid
+ 
+         ++i;
+     }
++    //logging
++     flog = fopen("test.tbrlog", "a+");
++     fprintf(flog, "f=nsHttpConnectionMgr::ProcessPendingQForEntry returns\tent=%p\n", ent);
++     fflush(flog);
++     fclose(flog);
+ 
+ #ifdef WTF_DEBUG
+     if (dispatchedSuccessfully) {
+@@ -1188,6 +1233,15 @@ nsHttpConnectionMgr::MakeNewConnection(nsConnectionEntry *ent,
+          this, ent, trans));
+     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+ 
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::MakeNewConnection\tt=%f\ttrans=%p\tent=%p\tents=%s\n", tp_now, trans, ent, ent->mConnInfo->Origin());
++    fflush(flog);
++    fclose(flog);
++
+     uint32_t halfOpenLength = ent->mHalfOpens.Length();
+     for (uint32_t i = 0; i < halfOpenLength; i++) {
+         if (ent->mHalfOpens[i]->IsSpeculative()) {
+@@ -1273,6 +1327,10 @@ nsHttpConnectionMgr::MakeNewConnection(nsConnectionEntry *ent,
+             conn->Close(NS_ERROR_ABORT);
+             mNumIdleConns--;
+             ConditionallyStopPruneDeadConnectionsTimer();
++            flog = fopen("test.tbrlog", "a+");
++            fprintf(flog, "f=nsHttpConnectionMgr::MakeNewConnection closed connection\tt=%f\tconn=%pmNumIdleConns=%d\n", tp_now, conn, mNumIdleConns);
++            fflush(flog);
++            fclose(flog);
+         }
+     }
+ 
+@@ -1306,8 +1364,13 @@ nsHttpConnectionMgr::MakeNewConnection(nsConnectionEntry *ent,
+         ;
+     }
+ 
+-    if (AtActiveConnectionLimit(ent, trans->Caps()))
++    if (AtActiveConnectionLimit(ent, trans->Caps())) {
++            flog = fopen("test.tbrlog", "a+");
++            fprintf(flog, "f=nsHttpConnectionMgr::MakeNewConnection AtActiveConnectionLimit\tt=%f\tent=%p\n", tp_now, ent);
++            fflush(flog);
++            fclose(flog);
+         return NS_ERROR_NOT_AVAILABLE;
++    }
+ 
+ #ifdef WTF_DEBUG
+         fprintf(stderr, "WTF: MakeNewConnection() is creating a transport (pipelines %d) for host %s\n",
+@@ -1315,12 +1378,20 @@ nsHttpConnectionMgr::MakeNewConnection(nsConnectionEntry *ent,
+ #endif
+ 
+     nsresult rv = CreateTransport(ent, trans, trans->Caps(), false, false, true);
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::MakeNewConnection CreateTransport\tt=%f\tent=%p\n", tp_now, ent);
++    fflush(flog);
++    fclose(flog);
+     if (NS_FAILED(rv)) {
+         /* hard failure */
+         LOG(("nsHttpConnectionMgr::MakeNewConnection [ci = %s trans = %p] "
+              "CreateTransport() hard failure.\n",
+              ent->mConnInfo->HashKey().get(), trans));
+         trans->Close(rv);
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::MakeNewConnection Failure\tt=%f\tent=%p\n", tp_now, ent);
++    fflush(flog);
++    fclose(flog);
+         if (rv == NS_ERROR_NOT_AVAILABLE)
+             rv = NS_ERROR_FAILURE;
+         return rv;
+@@ -1467,6 +1538,17 @@ nsHttpConnectionMgr::AddToBestPipeline(nsConnectionEntry *ent,
+     if (NS_FAILED(rv))
+         return false;
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::AddToBestPipeline\tt=%f\ttrans=%p\tactiveTrans=%p\tconn=%p\n", tp_now, trans, activeTrans, bestConn);
++    fflush(flog);
++    fclose(flog);
++
++
+     LOG(("   scheduling trans %p on pipeline at position %d, type %s\n",
+          trans, trans->PipelinePosition(), type));
+ 
+@@ -1544,6 +1626,23 @@ nsHttpConnectionMgr::TryDispatchTransaction(nsConnectionEntry *ent,
+                                             nsHttpTransaction *trans)
+ {
+     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
++
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    nsIRequestContext *logrequestContext = trans->RequestContext();
++    if (logrequestContext) {
++        fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction\tt=%f\ttrans=%p\tcontext=%p\n", tp_now, trans, logrequestContext);
++    }
++    else {
++        fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction\tt=%f\ttrans=%p\n", tp_now, trans);
++    }
++    fflush(flog);
++    fclose(flog);
++
+     LOG(("nsHttpConnectionMgr::TryDispatchTransaction without conn "
+          "[trans=%p ci=%p ci=%s caps=%x tunnelprovider=%p onlyreused=%d "
+          "active=%d idle=%d]\n", trans,
+@@ -1594,6 +1693,10 @@ nsHttpConnectionMgr::TryDispatchTransaction(nsConnectionEntry *ent,
+                     // need to wait for blockers to clear
+                     LOG(("   blocked by request context: [rc=%p trans=%p blockers=%d]\n",
+                          requestContext, trans, blockers));
++                    flog = fopen("test.tbrlog", "a+");
++                    fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction blocked\tt=%f\ttrans=%p\tcontext=%p\n", tp_now, trans, requestContext);
++                    fflush(flog);
++                    fclose(flog);
+                     return NS_ERROR_NOT_AVAILABLE;
+                 }
+             }
+@@ -1601,6 +1704,7 @@ nsHttpConnectionMgr::TryDispatchTransaction(nsConnectionEntry *ent,
+     } else {
+         // Mark the transaction and its load group as blocking right now to prevent
+         // other transactions from being reordered in the queue due to slow syns.
++
+         trans->DispatchedAsBlocking();
+     }
+ 
+@@ -1633,6 +1737,10 @@ nsHttpConnectionMgr::TryDispatchTransaction(nsConnectionEntry *ent,
+         }
+         if (!runNow) {
+             LOG(("   blocked due to rate pacing trans=%p\n", trans));
++            flog = fopen("test.tbrlog", "a+");
++            fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction rate-paced\tt=%f\ttrans=%p\n", tp_now, trans);
++            fflush(flog);
++            fclose(flog);
+             return NS_ERROR_NOT_AVAILABLE;
+         }
+     }
+@@ -1646,9 +1754,15 @@ nsHttpConnectionMgr::TryDispatchTransaction(nsConnectionEntry *ent,
+     if (HasPipelines(ent) &&
+             ent->mPendingQ.Length() < mMaxOptimisticPipelinedRequests &&
+             trans->Classification() != nsAHttpTransaction::CLASS_SOLO &&
+-            caps & NS_HTTP_ALLOW_PIPELINING)
++            caps & NS_HTTP_ALLOW_PIPELINING) {
+         allowNewPipelines = false;
+ 
++        flog = fopen("test.tbrlog", "a+");
++        fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction does not allow new pipelines\tt=%f\ttrans=%p\n", tp_now, trans);
++        fflush(flog);
++        fclose(flog);
++    }
++
+     // step 3: consider an idle persistent connection
+     if (allowNewPipelines && (caps & NS_HTTP_ALLOW_KEEPALIVE)) {
+         RefPtr<nsHttpConnection> conn;
+@@ -1656,26 +1770,41 @@ nsHttpConnectionMgr::TryDispatchTransaction(nsConnectionEntry *ent,
+             conn = ent->mIdleConns[0];
+             ent->mIdleConns.RemoveElementAt(0);
+             mNumIdleConns--;
++            
++            //logging
++            flog = fopen("test.tbrlog", "a+");
++            fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction took mIdleConns[0]\tconn=%p\ttrans=%p\n", conn, trans);
+ 
+             // we check if the connection can be reused before even checking if
+             // it is a "matching" connection.
+             if (!conn->CanReuse()) {
+                 LOG(("   dropping stale connection: [conn=%p]\n", conn.get()));
++                fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction killed mIdleConns[0]\tconn=%p\ttrans=%p\n", conn, trans);
+                 conn->Close(NS_ERROR_ABORT);
+                 conn = nullptr;
+             }
+             else {
+                 LOG(("   reusing connection [conn=%p]\n", conn.get()));
++                fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction is reusing mIdleConns[0]\tconn=%p\ttrans=%p\n", conn, trans);
+                 conn->EndIdleMonitoring();
+             }
+ 
+             // If there are no idle connections left at all, we need to make
+             // sure that we are not pruning dead connections anymore.
+             ConditionallyStopPruneDeadConnectionsTimer();
++            fflush(flog);
++            fclose(flog);
+         }
+         if (conn) {
+             // This will update the class of the connection to be the class of
+             // the transaction dispatched on it.
++            
++            //logging
++            flog = fopen("test.tbrlog", "a+");
++            fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction called DispatchTransaction\tconn=%p\ttrans=%p\n", conn, trans);
++            fflush(flog);
++            fclose(flog);
++
+             AddActiveConn(conn, ent);
+             DispatchTransaction(ent, trans, conn);
+             LOG(("   dispatched step 2 (idle) trans=%p\n", trans));
+@@ -1686,6 +1815,12 @@ nsHttpConnectionMgr::TryDispatchTransaction(nsConnectionEntry *ent,
+     // step 4: Maybe make a connection?
+     if (!onlyReusedConnection && allowNewPipelines) {
+         nsresult rv = MakeNewConnection(ent, trans);
++            
++        //logging
++        flog = fopen("test.tbrlog", "a+");
++        fprintf(flog, "f=nsHttpConnectionMgr::TryDispatchTransaction called MakeNewConnection\ttrans=%p\n", trans);
++        fflush(flog);
++        fclose(flog);
+         if (NS_SUCCEEDED(rv)) {
+             // this function returns NOT_AVAILABLE for asynchronous connects
+             LOG(("   dispatched step 4 (async new conn) trans=%p\n", trans));
+@@ -1739,6 +1874,16 @@ nsHttpConnectionMgr::DispatchTransaction(nsConnectionEntry *ent,
+     int32_t priority = trans->Priority();
+     nsresult rv;
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::DispatchTransaction\tt=%f\ttrans=%p\tconn=%p\tcaps=%u\n", tp_now, trans, conn, caps);
++    fflush(flog);
++    fclose(flog);
++
+     LOG(("nsHttpConnectionMgr::DispatchTransaction "
+          "[ent-ci=%s %p trans=%p caps=%x conn=%p priority=%d]\n",
+          ent->mConnInfo->HashKey().get(), ent, trans, caps, conn, priority));
+@@ -1749,6 +1894,13 @@ nsHttpConnectionMgr::DispatchTransaction(nsConnectionEntry *ent,
+     trans->CancelPacing(NS_OK);
+ 
+     if (conn->UsingSpdy()) {
++        //logging
++        FILE * flog;
++        flog = fopen("test.tbrlog", "a+");
++        fprintf(flog, "f=nsHttpConnectionMgr::DispatchTransaction\tg=UsingSpdy\ttrans=%p\tconn=%p\n", trans, conn);
++        fflush(flog);
++        fclose(flog);
++
+         LOG(("Spdy Dispatch Transaction via Activate(). Transaction host = %s, "
+              "Connection host = %s\n",
+              trans->ConnectionInfo()->Origin(),
+@@ -2018,6 +2170,17 @@ nsHttpConnectionMgr::ProcessNewTransaction(nsHttpTransaction *trans)
+         }
+ 
+         trans->SetConnection(nullptr);
++
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::ProcessNewTransaction\tt=%f\ttrans=%p\tconn=%p\n", tp_now, trans, conn);
++    fflush(flog);
++    fclose(flog);
++
+ #ifdef WTF_TEST
+         fprintf(stderr, "WTF-bad: Sticky connection status on 1 transaction to host %s\n",
+                 ent->mConnInfo->Origin());
+@@ -2074,6 +2237,15 @@ nsHttpConnectionMgr::CreateTransport(nsConnectionEntry *ent,
+ {
+     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+ 
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::CreateTransport\tt=%f\ttrans=%p\tent=%p\n", tp_now, trans, ent);
++    fflush(flog);
++    fclose(flog);
++
+     RefPtr<nsHalfOpenSocket> sock = new nsHalfOpenSocket(ent, trans, caps);
+     if (speculative) {
+         sock->SetSpeculative(true);
+@@ -2408,6 +2580,11 @@ nsHttpConnectionMgr::OnMsgProcessPendingQ(int32_t, ARefBase *param)
+     nsHttpConnectionInfo *ci = static_cast<nsHttpConnectionInfo *>(param);
+ 
+     if (!ci) {
++        FILE * flog;
++        flog = fopen("test.tbrlog", "a+");
++        fprintf(flog, "f=OnMsgProcessPendingQ calls ProcessPendingQForEntry with null ci\n");
++        fflush(flog);
++        fclose(flog);
+         LOG(("nsHttpConnectionMgr::OnMsgProcessPendingQ [ci=nullptr]\n"));
+         // Try and dispatch everything
+         for (auto iter = mCT.Iter(); !iter.Done(); iter.Next()) {
+@@ -2421,6 +2598,13 @@ nsHttpConnectionMgr::OnMsgProcessPendingQ(int32_t, ARefBase *param)
+ 
+     // start by processing the queue identified by the given connection info.
+     nsConnectionEntry *ent = mCT.Get(ci->HashKey());
++
++    //logging
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=OnMsgProcessPendingQ calls ProcessPendingQForEntry\tci=%p\tent=%p\n", ci, ent);
++    fflush(flog);
++    fclose(flog);
+     if (!(ent && ProcessPendingQForEntry(ent, false))) {
+         // if we reach here, it means that we couldn't dispatch a transaction
+         // for the specified connection info.  walk the connection table...
+@@ -2661,6 +2845,17 @@ nsHttpConnectionMgr::OnMsgReclaimConnection(int32_t, ARefBase *param)
+ 
+     nsConnectionEntry *ent = LookupConnectionEntry(conn->ConnectionInfo(),
+                                                    conn, nullptr);
++
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::OnMsgReclaimConnection\tt=%f\tconn=%p\tent=%p\n", tp_now, conn, ent);
++    fflush(flog);
++    fclose(flog);
++
+     if (!ent) {
+         // this can happen if the connection is made outside of the
+         // connection manager and is being "reclaimed" for use with
+@@ -2723,6 +2918,10 @@ nsHttpConnectionMgr::OnMsgReclaimConnection(int32_t, ARefBase *param)
+         ent->mIdleConns.InsertElementAt(idx, conn);
+         mNumIdleConns++;
+         conn->BeginIdleMonitoring();
++        flog = fopen("test.tbrlog", "a+");
++        fprintf(flog, "f=nsHttpConnectionMgr::OnMsgReclaimConnection made conn idle\tt=%f\tconn=%p\tent=%p\n", tp_now, conn, ent);
++        fflush(flog);
++        fclose(flog);
+ 
+         // If the added connection was first idle connection or has shortest
+         // time to live among the watched connections, pruning dead
+@@ -2735,6 +2934,12 @@ nsHttpConnectionMgr::OnMsgReclaimConnection(int32_t, ARefBase *param)
+         conn->Close(NS_ERROR_ABORT);
+     }
+ 
++    //logging
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::OnMsgReclaimConnection calls OnMsgProcessPendingQ\tt=%f\tmConnInfo=%p\n", tp_now, ci);
++    fflush(flog);
++    fclose(flog);
++
+     OnMsgProcessPendingQ(0, ci);
+ }
+ 
+@@ -2988,6 +3193,15 @@ nsHttpConnectionMgr::OnMsgSpeculativeConnect(int32_t, ARefBase *param)
+     LOG(("nsHttpConnectionMgr::OnMsgSpeculativeConnect [ci=%s]\n",
+          args->mTrans->ConnectionInfo()->HashKey().get()));
+ 
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::OnMsgSpeculativeConnect\tt=%f\tci=%s\n", tp_now, args->mTrans->ConnectionInfo()->HashKey().get());
++    fflush(flog);
++    fclose(flog);
++
+     nsConnectionEntry *ent =
+         GetOrCreateConnectionEntry(args->mTrans->ConnectionInfo(), false);
+ 
+@@ -3147,6 +3361,15 @@ nsHalfOpenSocket::SetupStreams(nsISocketTransport **transport,
+         }
+     }
+ 
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHalfOpenSocket::SetupStreams\tt=%f\ttransport=%p\toutputstream=%p\tinputstream=%p\n", tp_now, transport, instream, outstream);
++    fflush(flog);
++    fclose(flog);
++
+     nsCOMPtr<nsISocketTransport> socketTransport;
+     nsCOMPtr<nsISocketTransportService> sts;
+ 
+@@ -3448,6 +3671,18 @@ nsHalfOpenSocket::OnOutputStreamReady(nsIAsyncOutputStream *out)
+     NetAddr peeraddr;
+     nsCOMPtr<nsIInterfaceRequestor> callbacks;
+     mTransaction->GetSecurityCallbacks(getter_AddRefs(callbacks));
++
++
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::nsHalfOpenSocket::OnOutputStreamReady\tt=%f\tthis=%p\toutputstream=%p\tconn=%p\tmTransaction=%p\tmEnt=%p\n", tp_now, this, out, conn, mTransaction, mEnt);
++    fflush(flog);
++    fclose(flog);
++
+     if (out == mStreamOut) {
+         TimeDuration rtt = TimeStamp::Now() - mPrimarySynStarted;
+         rv = conn->Init(mEnt->mConnInfo,
+@@ -3499,6 +3734,9 @@ nsHalfOpenSocket::OnOutputStreamReady(nsIAsyncOutputStream *out)
+ 
+     // if this is still in the pending list, remove it and dispatch it
+     index = mEnt->mPendingQ.IndexOf(mTransaction);
++
++    //slow blast logging
++    //index = -1
+     if (index != -1) {
+         MOZ_ASSERT(!mSpeculative,
+                    "Speculative Half Open found mTransaction");
+@@ -3509,6 +3747,13 @@ nsHalfOpenSocket::OnOutputStreamReady(nsIAsyncOutputStream *out)
+         fprintf(stderr, "WTF: Speculative half-opened connection is now ready for %s (pipelines %d)\n",
+                 mEnt->mConnInfo->Origin(), mEnt->SupportsPipelining());
+ #endif
++
++    //logging
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::nsHalfOpenSocket::OnOutputStreamReady calls DispatchTransaction\tthis=%p\toutputstream=%p\tconn=%p\tmTransaction=%p\tmEnt=%p\n", this, out, conn, mTransaction, mEnt);
++    fflush(flog);
++    fclose(flog);
++
+         rv = gHttpHandler->ConnMgr()->DispatchTransaction(mEnt, temp, conn);
+     } else {
+         // this transaction was dispatched off the pending q before all the
+@@ -3542,6 +3787,13 @@ nsHalfOpenSocket::OnOutputStreamReady(nsIAsyncOutputStream *out)
+ 
+             gHttpHandler->ConnMgr()->AddActiveConn(conn, mEnt);
+             conn->Classify(nsAHttpTransaction::CLASS_SOLO);
++
++    //logging
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::nsHalfOpenSocket::OnOutputStreamReady calls DispatchAbstractTransaction\tthis=%p\toutputstream=%p\tconn=%p\tmTransaction=%p\tmEnt=%p\n", this, out, conn, mTransaction, mEnt);
++    fflush(flog);
++    fclose(flog);
++
+             rv = gHttpHandler->ConnMgr()->
+                 DispatchAbstractTransaction(mEnt, trans, mCaps, conn, 0);
+         } else {
+@@ -4062,11 +4314,18 @@ nsConnectionEntry::RemoveHalfOpen(nsHalfOpenSocket *halfOpen)
+         }
+     }
+ 
+-    if (!UnconnectedHalfOpens())
++    if (!UnconnectedHalfOpens()) {
+         // perhaps this reverted RestrictConnections()
+         // use the PostEvent version of processpendingq to avoid
+         // altering the pending q vector from an arbitrary stack
++    //logging
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpConnectionMgr::nsConnectionEntry::RemoveHalfOpen calls ProcessPendingQ\tmConnInfo=%p\n", mConnInfo);
++    fflush(flog);
++    fclose(flog);
+         gHttpHandler->ConnMgr()->ProcessPendingQ(mConnInfo);
++    }
+ }
+ 
+ void
+diff --git a/netwerk/protocol/http/nsHttpTransaction.cpp b/netwerk/protocol/http/nsHttpTransaction.cpp
+index ee3a884..1050d1c 100644
+--- a/netwerk/protocol/http/nsHttpTransaction.cpp
++++ b/netwerk/protocol/http/nsHttpTransaction.cpp
+@@ -39,6 +39,7 @@
+ #include "nsIOService.h"
+ #include "nsIRequestContext.h"
+ #include "nsIHttpAuthenticator.h"
++#include "sys/time.h" //blast logging
+ #include <algorithm>
+ 
+ #ifdef MOZ_WIDGET_GONK
+@@ -262,6 +263,22 @@ nsHttpTransaction::Init(uint32_t caps,
+     if (channel) {
+         NS_GetAppInfo(channel, &mAppId, &mIsInIsolatedMozBrowser);
+     }
++    //logging
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    nsAutoCString tbrlog_method;
++    requestHead->Method(tbrlog_method);
++    nsAutoCString tbrlog_URI;
++    requestHead->RequestURI(tbrlog_URI);
++    nsAutoCString tbrlog_origin;
++    requestHead->Origin(tbrlog_origin);
++    int testerer = 1;
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    fprintf(flog, "f=nsHttpTransaction::Init\tt=%f\tptr=%p\tmethodname=%s\tURI=%s\torigin=%s\tchannel=%p\n", tp_now, this, tbrlog_method.get(), tbrlog_URI.get(), tbrlog_origin.get(), this->HttpChannel());
++    fflush(flog);
++    fclose(flog);
+ 
+ #ifdef MOZ_WIDGET_GONK
+     if (mAppId != NECKO_NO_APP_ID) {
+@@ -282,7 +299,6 @@ nsHttpTransaction::Init(uint32_t caps,
+         }
+         httpChannelInternal->GetInitialRwin(&mInitialRwin);
+     }
+-
+     // create transport event sink proxy. it coalesces consecutive
+     // events of the same status type.
+     rv = net_NewTransportEventSinkProxy(getter_AddRefs(mTransportSink),
+@@ -696,6 +712,37 @@ nsHttpTransaction::ReadRequestSegment(nsIInputStream *stream,
+ {
+     nsHttpTransaction *trans = (nsHttpTransaction *) closure;
+     nsresult rv = trans->mReader->OnReadSegment(buf, count, countRead);
++
++    //logging
++
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpTransaction::ReadRequestSegment\tt=%f\tptr=%p\toffset=%zu\tcount=%zu\tcountRead=%zu\n", tp_now, trans, offset, count, *countRead);
++    fflush(flog);
++    fclose(flog);
++
++    /*FILE * flog2;
++    flog2 = fopen("testdata.tbrlog", "a+");
++    fprintf(flog2, "f=nsHttpTransaction::ReadRequestSegment\tt=%f\ttype=tstart\n", tp_now);
++    for (int i = 0; i < *countRead; i++) {
++        fprintf(flog2, "%c", buf[i]);
++    }
++    fprintf(flog2, "\nf=nsHttpTransaction::ReadRequestSegment\tt=%f\ttype=tend\n", tp_now);
++
++
++    fprintf(flog2, "f=nsHttpTransaction::ReadRequestSegment\tt=%f\ttype=start\n\n", tp_now);
++    for (int i = 0; i < *countRead; i++) {
++        fprintf(flog2, "%02x", (unsigned char)buf[i]);
++        if (i % 64 == 63) fprintf(flog2, "\n");
++        else if (i % 16 == 15) fprintf(flog2, " ");
++    }
++    fprintf(flog2, "\nf=nsHttpTransaction::ReadRequestSegment\tt=%f\ttype=end\n\n", tp_now);
++    fflush(flog2);
++    fclose(flog2);*/
++
+     if (NS_FAILED(rv)) return rv;
+ 
+     if (trans->TimingEnabled()) {
+@@ -803,6 +850,35 @@ nsHttpTransaction::WritePipeSegment(nsIOutputStream *stream,
+     trans->mReceivedData = true;
+     trans->mTransferSize += *countWritten;
+ 
++    //logging
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpTransaction::WritePipeSegment\tt=%f\tptr=%p\toffset=%zu\tcount=%zu\tcountWritten=%zu\n", tp_now, trans, offset, count, *countWritten);
++    fflush(flog);
++    fclose(flog);
++
++    /*if (*countWritten > 0) {
++        int writable = 0;// 1;
++
++        FILE * flog2;
++        flog2 = fopen("testdata.tbrlog", "a+");
++
++        if (writable == 0) {
++            fprintf(flog2, "f=nsHttpTransaction::WritePipeSegment\tt=%f\ttype=start\n\n", tp_now);
++            for (int i = 0; i < *countWritten; i++) {
++                fprintf(flog2, "%02x", (unsigned char)buf[i]);
++	            if (i % 64 == 63) fprintf(flog2, "\n");
++	            else if (i % 16 == 15) fprintf(flog2, " ");
++            }
++            fprintf(flog2, "\nf=nsHttpTransaction::WritePipeSegment\tt=%f\ttype=end\n\n", tp_now);
++        }
++        fflush(flog2);
++        fclose(flog2);
++    }*/
++
+     // Let the transaction "play" with the buffer.  It is free to modify
+     // the contents of the buffer and/or modify countWritten.
+     // - Bytes in HTTP headers don't count towards countWritten, so the input
+@@ -1817,6 +1893,14 @@ nsHttpTransaction::HandleContent(char *buf,
+     if ((mContentRead == mContentLength) ||
+         (mChunkedDecoder && mChunkedDecoder->ReachedEOF())) {
+         // the transaction is done with a complete response.
++
++        //logging
++        FILE * flog;
++        flog = fopen("test.tbrlog", "a+");
++        fprintf(flog, "f=nsHttpTransaction::HandleContent mResponseIsComplete\tptr=%p\tmContentLength=%" PRId64 "\tmTransferSize=%" PRId64 "\n", this, mContentLength, GetTransferSize());
++        fflush(flog);
++        fclose(flog);
++
+         mTransactionDone = true;
+         mResponseIsComplete = true;
+         ReleaseBlockingTransaction();
+@@ -1972,6 +2056,18 @@ nsHttpTransaction::DispatchedAsBlocking()
+     LOG(("nsHttpTransaction adding blocking transaction %p from "
+          "request context %p\n", this, mRequestContext.get()));
+ 
++    //logging
++
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=nsHttpTransaction::DispatchedAsBlocking\tt=%f\ttrans=%p\tcontext=%p\n", tp_now, this, mRequestContext.get());
++    fflush(flog);
++    fclose(flog);
++
++
+     mRequestContext->AddBlockingTransaction();
+     mDispatchedAsBlocking = true;
+ }
+diff --git a/security/nss/lib/certhigh/ocsp.c b/security/nss/lib/certhigh/ocsp.c
+index b31ce1d..1b63abe 100644
+--- a/security/nss/lib/certhigh/ocsp.c
++++ b/security/nss/lib/certhigh/ocsp.c
+@@ -1940,6 +1940,7 @@ static ocspSingleRequest **
+ ocsp_CreateSingleRequestList(PLArenaPool *arena, CERTCertList *certList,
+                              PRTime time, PRBool includeLocator)
+ {
++
+     ocspSingleRequest **requestList = NULL;
+     CERTCertListNode *node = NULL;
+     int i, count;
+@@ -1965,6 +1966,7 @@ ocsp_CreateSingleRequestList(PLArenaPool *arena, CERTCertList *certList,
+ 
+         OCSP_TRACE(("OCSP CERT_CreateOCSPRequest %s\n", node->cert->subjectName));
+         requestList[i]->arena = arena;
++
+         requestList[i]->reqCert = ocsp_CreateCertID(arena, node->cert, time);
+         if (requestList[i]->reqCert == NULL)
+             goto loser;
+diff --git a/security/nss/lib/ssl/ssl3con.c b/security/nss/lib/ssl/ssl3con.c
+index 186ce23..417586c 100644
+--- a/security/nss/lib/ssl/ssl3con.c
++++ b/security/nss/lib/ssl/ssl3con.c
+@@ -11658,6 +11658,31 @@ ssl3_HandleHandshakeMessage(sslSocket *ss, SSL3Opaque *b, PRUint32 length,
+     PRBool computeHashes = PR_FALSE;
+     PRUint16 epoch;
+ 
++
++
++    //logging
++    if (length > 0) {
++        PRUint8 logtype = (PRUint8) type;
++
++	FILE * flog;
++    	flog = fopen("test.tbrlog", "a+");
++        fprintf(flog, "f=ssl3_HandleHandshakeMessage\tmsgtype=%d\turl=%s\tlength=%d\n", logtype, ss->url, length);
++        fflush(flog);
++        fclose(flog);
++
++	/*FILE * flog2;
++    	flog2 = fopen("testdata.tbrlog", "a+");
++        fprintf(flog2, "f=ssl3_HandleHandshakeMessage\tmsgtype=%d\turl=%s\ttype=start\n", logtype, ss->url);
++        for (int i = 0; i < length; i++) {
++            fprintf(flog2, "%02x", b[i]);
++	    if (i % 64 == 63) fprintf(flog2, "\n");
++	    else if (i % 16 == 15) fprintf(flog2, " ");
++        }
++        fprintf(flog2, "\nf=ssl3_HandleHandshakeMessage\tmsgtype=%d\turl=%s\ttype=end\n", logtype, ss->url);
++        fflush(flog2);
++        fclose(flog2);*/
++    }
++
+     PORT_Assert(ss->opt.noLocks || ssl_HaveRecvBufLock(ss));
+     PORT_Assert(ss->opt.noLocks || ssl_HaveSSL3HandshakeLock(ss));
+     /*
+diff --git a/security/nss/lib/ssl/ssldef.c b/security/nss/lib/ssl/ssldef.c
+index 77a744c..8a91c83 100644
+--- a/security/nss/lib/ssl/ssldef.c
++++ b/security/nss/lib/ssl/ssldef.c
+@@ -8,6 +8,7 @@
+ #include "cert.h"
+ #include "ssl.h"
+ #include "sslimpl.h"
++#include "sys/time.h" //logging
+ 
+ #if defined(WIN32)
+ #define MAP_ERROR(from, to) \
+@@ -67,6 +68,33 @@ ssl_DefRecv(sslSocket *ss, unsigned char *buf, int len, int flags)
+     int rv;
+ 
+     rv = lower->methods->recv(lower, (void *)buf, len, flags, ss->rTimeout);
++
++    /*//logging
++
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++
++    FILE * flog;
++    flog = fopen("test.tbrlog", "a+");
++    fprintf(flog, "f=ssl_DefRecv\tt=%f\tptr=%p\tlen=%d\trv=%d\n", tp_now, ss, len, rv);
++    fflush(flog);
++    fclose(flog);
++
++    if (rv > 0) {
++	FILE * flog2;
++    	flog2 = fopen("testdata.tbrlog", "a+");
++        fprintf(flog2, "f=ssl_DefRecv\tt=%f\ttype=start\n", tp_now); //this would be encrypted
++        for (int i = 0; i < rv; i++) {
++            fprintf(flog2, "%02x", buf[i]);
++	    if (i % 64 == 63) fprintf(flog2, "\n");
++	    else if (i % 16 == 15) fprintf(flog2, " ");
++        }
++        fprintf(flog2, "\nf=ssl_DefRecv\tt=%f\ttype=end\n", tp_now);
++        fflush(flog2);
++        fclose(flog2);
++    }*/
++
+     if (rv < 0) {
+         DEFINE_ERROR
+         MAP_ERROR(PR_SOCKET_SHUTDOWN_ERROR, PR_CONNECT_RESET_ERROR)
+@@ -102,6 +130,32 @@ ssl_DefSend(sslSocket *ss, const unsigned char *buf, int len, int flags)
+     do {
+         int rv = lower->methods->send(lower, (const void *)(buf + sent),
+                                       len - sent, flags, ss->wTimeout);
++
++	/*//logging
++
++	struct timeval tp;
++	gettimeofday(&tp, NULL);
++    	double tp_now = tp.tv_sec + tp.tv_usec/1000000.0;
++	FILE * flog;
++	flog = fopen("test.tbrlog", "a+");
++	fprintf(flog, "f=ssl_DefSend\tt=%f\tptr=%p\tlen=%d\trv=%d\n", tp_now, ss, len, rv);
++    	fflush(flog);
++	fclose(flog);
++
++	if (rv > 0) {
++		FILE * flog2;
++		flog2 = fopen("testdata.tbrlog", "a+");
++		fprintf(flog2, "f=ssl_DefSend\tt=%f\ttype=start\n", tp_now); //this would be encrypted
++		for (int i = 0; i < rv; i++) {
++			fprintf(flog2, "%02x", buf[i]);
++			if (i % 64 == 63) fprintf(flog2, "\n");
++			else if (i % 16 == 15) fprintf(flog2, " ");
++		}
++		fprintf(flog2, "\nf=ssl_DefSend\tt=%f\ttype=end\n", tp_now);
++		fflush(flog2);
++    		fclose(flog2);
++	}*/
++
+         if (rv < 0) {
+             PRErrorCode err = PR_GetError();
+             if (err == PR_WOULD_BLOCK_ERROR) {
