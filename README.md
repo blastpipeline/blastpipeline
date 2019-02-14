@@ -24,7 +24,7 @@ cutlog.py turns .torlog files into .trlg files.
 parentreader.py reads files from a version of Tor Browser specifically designed to
 load resources one by one, so parenthood is easier to determine.
 It creates parentdata.txt, which we also included, so you don't have to run parentreader.py.
-parentfinder.py determines parents.
+parentfinder.py determines parents and writes to simdata. 
 dillwriter.py reads .tbrlog, .tdrlog, and .trlg files to parse all relevant information into a single dill file. 
 
 Simulator
@@ -37,6 +37,9 @@ are optionals within both code.
 
 Data sets
 ---
-(compare.zip)
+(compare.zip, simdata.zip, simdelay.zip)
+Simdata.zip contains some of our simdata files (described above).
+simdelay.zip as well. 
+compare.zip contains tbrlog files for comparison. 
 Our full data is too large to be put here.
 We will release them on our own website after publication. 
