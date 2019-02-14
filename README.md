@@ -38,8 +38,10 @@ are optionals within both code.
 Data sets
 ---
 (compare.zip, simdata.zip, simdelay.zip)
+
 Simdata.zip contains some of our simdata files (described above).
 simdelay.zip as well. 
 compare.zip contains tbrlog files for comparison. 
+We put them into the data branch so that the initial pull is not overwhelmingly large.
 Our full data is too large to be put here.
 We will release them on our own website after publication. 
