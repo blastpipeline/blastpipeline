@@ -1,16 +1,18 @@
 # Repository for "Designing a better Browser for Tor with BLAST"
 
-Logger 
+Logger and Pipelining implementation for TB-8.5
 ---
-(blast-tor-log.diff, blast-tbr-log.diff)
+(blast-tbr-log.diff)
 
-We implemented the BLAST logger by instrument Tor and Tor Browser.
-Therefore we present both of them as diff files
-in blast-tor-log.diff and blast-tbr-log.diff respectively. 
+We implemented the BLAST logger by instrument Tor Browser.
+We also re-implemented pipelining into TB-8.5. 
+We present this as a diff file, applicable to
+the git branch tor-browser-60.5.1esr-8.5-1
+on https://git.torproject.org/tor-browser.git.
 
 Runner
 ---
-(runtor-tree-4.sh, top-200-tree)
+(runtor-tree.sh, top-200-tree)
 
 This is the simple shell code and the site list we used to load our data set.
 The shell code is unlikely to work for your computer since it is entirely
@@ -18,30 +20,23 @@ dependent on our setup; it is here for transparency.
 
 Analyzer
 ---
-(cutlog.py, parentreader.py, parentdata.txt, parentfinder.py, dillwriter.py)
+(logreader.py, logreader-dill.py, logreader-simdata.py)
 
-cutlog.py turns .torlog files into .trlg files. 
-parentreader.py reads files from a version of Tor Browser specifically designed to
-load resources one by one, so parenthood is easier to determine.
-It creates parentdata.txt, which we also included, so you don't have to run parentreader.py.
-parentfinder.py determines parents and writes to simdata. 
-dillwriter.py reads .tbrlog, .tdrlog, and .trlg files to parse all relevant information into a single dill file. 
+logreader.py reads Tor Browser logs (from the Logger) and parses them, outputting dills. It includes the parent finding algorithm.
+logreader-dill.py reads those dills and outputs some interesting information about them.
+logreader-simdata.py re-parses dills into simdata for the Simulator.
+Since they are designed for the researcher, a lot of stuff that shouldn't be hardcoded are, so it'll take some effort to get it to work with your setup. 
 
 Simulator
 ---
-(Sim.py, Sim-better.py)
+(Sim-http2.py, pipelined-servers.txt, prefetch-res.dill)
 
-The simulator reads simdata files (created from parentfinder.py) to generate trace-like objects in .simdelay. 
-Sim-better uses better pipelining (which isn't easy to modulate). Otherwise, all the other models
-are optionals within both code. 
+The simulator reads simdata files (created from logreader-simdata.py) to generate trace-like objects in .simres.
+It can also read lists of resources to (prefetch-res.dill) and which servers support pipelining (pipelined-servers.txt).
 
 Data sets
 ---
-(compare.zip, simdata.zip, simdelay.zip)
+(logs.zip, simdata.zip)
 
-Simdata.zip contains some of our simdata files (described above).
-simdelay.zip as well. 
-compare.zip contains tbrlog files for comparison. 
-We put them into the data branch so that the initial pull is not overwhelmingly large.
-Our full data is too large to be put here.
-We will release them on our own website after publication. 
+logs.zip contains some TB-8.5 logs. We will release the full data set later when we are not restricted by data size.
+simdata.zip contains some valid input files for the Simulator. You should be able to obtain them by parsing the logs.zip files with logreader.py and logreader-simdata.py too. 
