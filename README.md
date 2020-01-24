@@ -34,6 +34,12 @@ Simulator
 The simulator reads simdata files (created from logreader-simdata.py) to generate trace-like objects in .simres.
 It can also read lists of resources to (prefetch-res.dill) and which servers support pipelining (pipelined-servers.txt).
 
+Implementation
+---
+(logger.zip)
+
+Prototype implementation of the servers database and resource prefetching database can be found in logger.zip. 
+
 Data sets
 ---
 (logs.zip, simdata.zip)
