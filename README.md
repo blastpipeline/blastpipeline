@@ -44,8 +44,8 @@ Data sets
 ---
 (logs.zip, simdata.zip)
 
-<img align="left" src="http://home.cse.ust.hk/~taow/ndss20-table.png">
-
-
 logs.zip contains some TB-8.5 logs. Full data available here: http://home.cse.ust.hk/~taow/tree/data/
+
+Here are some statistics: http://home.cse.ust.hk/~taow/ndss20-table.png
+
 simdata.zip contains some valid input files for the Simulator. You should be able to obtain them by parsing the logs.zip files with logreader.py and logreader-simdata.py too. 
